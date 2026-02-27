@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Keystroke Dynamics Demo</title>
+</head>
+<body>
+  <h1>Keystroke Dynamics for Early Cognitive Decline</h1>
+  <p>This simple web interface demonstrates a "real AI" process in language
+     anyone can understand.</p>
+  <p>It never records what you type.  Instead, it measures how long each key
+     is held and how quickly you move to the next one.  These timing
+     signals are fed to a machine-learning model that looks for small changes
+     in typing rhythm—changes that can be an early warning sign of cognitive
+     decline such as mild cognitive impairment or early Alzheimer’s disease.</p>
+  <p>To see the model at work, click the buttons below.  They will request
+     the appropriate endpoint and display the results without leaving this page.</p>
+  <button id="btn-report">Get report</button>
+  <button id="btn-predict">Run one prediction</button>
+
+  <h2>Type some text below to see the AI work on live keystroke timing data</h2>
+  <textarea id="typing-area" rows="6" cols="60" placeholder="Start typing...">
+Keystroke Dynamics for Early Alzheimer’s / Cognitive Decline
+Mild Cognitive Impairment (MCI) and early Alzheimer's disease are notoriously difficult to detect until significant memory loss occurs. Traditional cognitive tests (like drawing a clock or repeating words) require clinical visits and active effort.
+The Concept: A custom smartphone keyboard that passively analyzes how a user types (not what they type) to detect the micro-motor and cognitive slowdowns associated with neurological decline.
+The Passive Signals:
+Hold Time: The exact duration (in milliseconds) a finger presses a key.
+Flight Time: The time it takes for the finger to travel from releasing one key to pressing the next.
+Typing Cadence Variability & Backspace Frequency: Inconsistencies in motor rhythm and increased error-correction rates.
+Technical Architecture (Software Focus):
+Frontend: A custom Android keyboard (using the InputMethodService API) that registers timestamps for ACTION_DOWN and ACTION_UP touch events.
+Privacy Layer: The app explicitly discards the actual characters typed, logging only the timing metadata and spatial coordinates to ensure total data privacy.
+Backend/ML: A machine learning classifier (like a Support Vector Machine or Random Forest) deployed on the phone to detect deviations from the user's historical baseline typing rhythm.
+  </textarea>
+  <button id="btn-submit">Submit keystrokes</button>
+
+  <pre id="output" style="background:#f0f0f0;padding:1em;
+     border:1px solid #ccc;max-height:300px;overflow:auto;"></pre>
+
+  <script>
+  async function fetchJson(path, options) {
+    const res = await fetch(path, options);
+    const data = await res.json();
+    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+  }
+  document.getElementById('btn-report').addEventListener('click', () => {
+    fetchJson('/report');
+  });
+  document.getElementById('btn-predict').addEventListener('click', () => {
+    fetchJson('/predict');
+  });
+
+  // keystroke timing capture
+  const area = document.getElementById('typing-area');
+  let lastUp = null;
+  let lastDown = null;
+  const events = [];
+  area.addEventListener('keydown', e => {
+    lastDown = performance.now();
+  });
+  area.addEventListener('keyup', e => {
+    const now = performance.now();
+    const hold = now - (lastDown || now);
+    const flight = lastDown && lastUp ? lastDown - lastUp : 0;
+    lastUp = now;
+    events.push({
+      hold_time: hold,
+      flight_time: flight,
+      error: e.key === 'Backspace' ? 1 : 0
+    });
+  });
+  document.getElementById('btn-submit').addEventListener('click', () => {
+    fetchJson('/submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({events})
+    });
+  });
+  </script>
+</body>
+</html>
