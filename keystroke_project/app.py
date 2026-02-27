@@ -1,4 +1,12 @@
 from flask import Flask, jsonify, render_template, request
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+import base64
+import numpy as np
+import pandas as pd
 
 from .data_simulator import generate_dataset
 from .privacy import apply_privacy
@@ -100,9 +108,108 @@ def submit():
     safe = apply_privacy(df)
     feats = extract_features(safe)
     pred_feats = feats.drop(columns=["label", "session_id"], errors="ignore")
+    
+    # Get prediction and probability
     pred = trained_model.predict(pred_feats)
-    return jsonify({"prediction": pred.tolist()})
+    proba = trained_model.predict_proba(pred_feats)
+    
+    # Return comprehensive results
+    return jsonify({
+        "prediction": int(pred[0]),
+        "probability_decline": float(proba[0][1]),  # probability of class 1 (decline)
+        "probability_healthy": float(proba[0][0]),  # probability of class 0 (healthy)
+        "features": {
+            "hold_mean": float(pred_feats["hold_mean"].iloc[0]),
+            "hold_std": float(pred_feats["hold_std"].iloc[0]),
+            "flight_mean": float(pred_feats["flight_mean"].iloc[0]),
+            "flight_std": float(pred_feats["flight_std"].iloc[0]),
+            "error_rate": float(pred_feats["error_rate"].iloc[0]),
+            "n_keys": int(pred_feats["n_keys"].iloc[0])
+        }
+    })
+
+
+@app.route("/graphs")
+def graphs():
+    """Generate and return visualization graphs comparing good and bad datasets."""
+    # Generate good (healthy) and bad (cognitive decline) datasets
+    good_data = generate_dataset(sessions=100, decline_fraction=0.0)
+    bad_data = generate_dataset(sessions=100, decline_fraction=1.0)
+    
+    # Extract features
+    good_feats = extract_features(apply_privacy(good_data))
+    bad_feats = extract_features(apply_privacy(bad_data))
+    
+    # Add labels for plotting
+    good_feats['Dataset'] = 'Healthy Pattern'
+    bad_feats['Dataset'] = 'Cognitive Decline'
+    
+    combined = pd.concat([good_feats, bad_feats], ignore_index=True)
+    
+    # Create distribution graph
+    fig1, axes = plt.subplots(2, 2, figsize=(12, 10))
+    fig1.suptitle('Good vs Bad Typing Patterns Distribution', fontsize=16, fontweight='bold')
+    
+    sns.histplot(data=combined, x='hold_mean', hue='Dataset', kde=True, ax=axes[0,0])
+    axes[0,0].set_title('Hold Time Mean Distribution')
+    axes[0,0].set_xlabel('Hold Time (ms)')
+    
+    sns.histplot(data=combined, x='flight_mean', hue='Dataset', kde=True, ax=axes[0,1])
+    axes[0,1].set_title('Flight Time Mean Distribution')
+    axes[0,1].set_xlabel('Flight Time (ms)')
+    
+    sns.histplot(data=combined, x='hold_std', hue='Dataset', kde=True, ax=axes[1,0])
+    axes[1,0].set_title('Hold Time Variability')
+    axes[1,0].set_xlabel('Standard Deviation (ms)')
+    
+    sns.histplot(data=combined, x='error_rate', hue='Dataset', kde=True, ax=axes[1,1])
+    axes[1,1].set_title('Error Rate Distribution')
+    axes[1,1].set_xlabel('Error Rate')
+    
+    plt.tight_layout()
+    
+    # Convert to base64
+    buf1 = io.BytesIO()
+    plt.savefig(buf1, format='png', dpi=100, bbox_inches='tight')
+    buf1.seek(0)
+    img1_base64 = base64.b64encode(buf1.read()).decode('utf-8')
+    plt.close()
+    
+    # Create feature comparison graph
+    fig2, ax = plt.subplots(figsize=(10, 6))
+    
+    features_to_plot = ['hold_mean', 'flight_mean', 'hold_std', 'flight_std', 'error_rate']
+    good_means = [good_feats[f].mean() for f in features_to_plot]
+    bad_means = [bad_feats[f].mean() for f in features_to_plot]
+    
+    x = np.arange(len(features_to_plot))
+    width = 0.35
+    
+    ax.bar(x - width/2, good_means, width, label='Healthy Pattern', color='#4caf50', alpha=0.8)
+    ax.bar(x + width/2, bad_means, width, label='Cognitive Decline', color='#f44336', alpha=0.8)
+    
+    ax.set_xlabel('Features', fontweight='bold')
+    ax.set_ylabel('Average Value', fontweight='bold')
+    ax.set_title('Feature Comparison: Healthy vs Cognitive Decline', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(['Hold Time\nMean', 'Flight Time\nMean', 'Hold Time\nVariability', 
+                        'Flight Time\nVariability', 'Error Rate'])
+    ax.legend()
+    ax.grid(axis='y', alpha=0.3)
+    
+    plt.tight_layout()
+    
+    buf2 = io.BytesIO()
+    plt.savefig(buf2, format='png', dpi=100, bbox_inches='tight')
+    buf2.seek(0)
+    img2_base64 = base64.b64encode(buf2.read()).decode('utf-8')
+    plt.close()
+    
+    return jsonify({
+        "distribution_graph": f"data:image/png;base64,{img1_base64}",
+        "feature_comparison": f"data:image/png;base64,{img2_base64}"
+    })
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=8080)

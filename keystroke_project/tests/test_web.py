@@ -37,8 +37,9 @@ def test_homepage_contains_buttons():
     assert res.status_code == 200
     body = res.get_data(as_text=True)
     assert "btn-report" in body
-    assert "btn-predict" in body
-    assert "btn-submit" in body
+    assert "btn-analyze" in body
+    assert "btn-show-graphs" in body
+    assert "btn-reset" in body
 
 
 def test_submit_endpoint():
@@ -51,7 +52,11 @@ def test_submit_endpoint():
     assert res.status_code == 200
     data = res.get_json()
     assert "prediction" in data
-    assert isinstance(data["prediction"], list)
+    assert isinstance(data["prediction"], int)
+    assert "probability_decline" in data
+    assert "probability_healthy" in data
+    assert "features" in data
+    assert 0 <= data["prediction"] <= 1
 
 
 def test_submit_empty():
@@ -66,3 +71,15 @@ def test_submit_missing_fields():
     res = client.post("/submit", json={"events": [{"foo":1}]})
     assert res.status_code == 400
     assert "required" in res.get_json().get("error", "")
+
+
+def test_graphs_endpoint():
+    """Test that the graphs endpoint returns valid image data."""
+    client = flask_app.test_client()
+    res = client.get("/graphs")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "distribution_graph" in data
+    assert "feature_comparison" in data
+    assert data["distribution_graph"].startswith("data:image/png;base64,")
+    assert data["feature_comparison"].startswith("data:image/png;base64,")

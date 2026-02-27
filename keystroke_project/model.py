@@ -26,6 +26,10 @@ class KeystrokeModel:
         """Return class predictions for given feature vectors."""
         return self.clf.predict(feature_vector)
 
+    def predict_proba(self, feature_vector: pd.DataFrame) -> np.ndarray:
+        """Return probability estimates for each class."""
+        return self.clf.predict_proba(feature_vector)
+
     def save(self, path: str):
         joblib.dump(self.clf, path)
 

@@ -50,10 +50,10 @@ FLASK_APP=keystroke_project.app flask run
 
 Avoid running `flask` from inside the `keystroke_project` folder itself, otherwise
 Python won't be able to locate the package and you'll see an ImportError.  With
-the server running, open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your
+the server running, open [http://127.0.0.1:8080/](http://127.0.0.1:8080/) in your
 browser.
 
-Then open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your browser.
+Then open [http://127.0.0.1:8080/](http://127.0.0.1:8080/) in your browser.
 
 The `/report` endpoint returns a JSON report suitable for programmatic
 consumption, while the home page explains the idea in simple terms.

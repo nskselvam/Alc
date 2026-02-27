@@ -26,4 +26,4 @@ python -m pytest -q
 
 echo "starting Flask web server (use Ctrl-C to quit)..."
 # start from workspace root so package-relative imports resolve
-FLASK_APP=keystroke_project.app flask run
+FLASK_APP=keystroke_project.app flask run --port 8080
